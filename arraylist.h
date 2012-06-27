@@ -1,5 +1,5 @@
 /**
- *  @file   array.h
+ *  @file   arraylist.h
  *  @link   https://github.com/joaolpinho
  *
  *  @brief  Resizable & multi type support array
@@ -28,9 +28,11 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+#ifndef moustached_arraylist_h
+#define moustached_arraylist_h
 
-#ifndef moustached_array_h
-#define moustached_array_h
+#define A_EXPRATE 2
+#define A_LOADFACT 0.75
 
 #if !defined(MOUSTASHED_ITERATOR)
 #define MOUSTASHED_ITERATOR
@@ -49,21 +51,21 @@ struct _Iterator {
 };
 typedef struct _Iterator iterator;
 #endif
-typedef int Array;
+
+typedef int ArrayList;
 
 
-Array Anew(int);
-void Apurge(Array);
-void Adispose(Array);
+ArrayList ALnew(int);
+void ALpurge(ArrayList);
+void ALdispose(ArrayList);
 
-void *Aadd(Array, void*);
-void *Aget(Array, int);
-void *Aset(Array, int, void*);
-void *Aremove(Array, int);
+void *ALadd(ArrayList, void*);
+void *ALget(ArrayList, int);
+void *ALset(ArrayList, int, void*);
+void *ALremove(ArrayList, int);
 
-int Asize(Array);
-void** Atoarray(Array);
-iterator Aiterator(Array);
-
+int ALsize(ArrayList);
+void** ALtoarray(ArrayList);
+iterator ALiterator(ArrayList);
 
 #endif

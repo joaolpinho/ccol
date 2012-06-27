@@ -1,4 +1,14 @@
 /**
+ *  @file   arraylist.c
+ *  @link   https://github.com/joaolpinho
+ *
+ *  @brief  Resizable & multi type support array
+ *
+ *  @author João Pinho
+ *  @link   https://github.com/joaolpinho
+ *
+ *  @date   06/06/2012
+ *
  *  This file is part of moustashed-library.
  *
  *  moustashed-library is a C library of many utils and data structures.
@@ -25,14 +35,15 @@
 #include <stdlib.h>
 #include <errno.h>
 
-#include "array.h"
+#include "arraylist.h"
 
-#define EXPRATE 2
-#define LOADFACT 0.75
-#define INITCAPACITY 30
+#ifndef MOUSTASHED_ERROR_STRINGS
+    #define MOUSTASHED_ERROR_STRINGS
+    #define S_NOMEM "Allocating memory"
+    #define S_EFAULT "Invalid handler"
+#endif
 
-#define S_NOMEM "Allocating memory"
-#define S_EFAULT "Invalid handler"
+#define A_INITCAPACITY 30
 
 /**
  * Struct and Type definitions
@@ -61,62 +72,60 @@ static struct _Controller controller;
  *
  */
 static void check(struct _Array *);
-static int getfree();
-static void *Aitnext(iterator *);
-static void *Aitprev(iterator *);
-static void Aupdateit(iterator *);
-static void Aresetit(iterator *);
+static int getfreearray();
+static void *ALitnext(iterator *);
+static void *ALitprev(iterator *);
+static void ALupdateit(iterator *);
+static void ALresetit(iterator *);
 
 /**
  * Functions definition
  *
  */
-int Anew(int init_size) {
+int ALnew(int init_size) {
     int handler = -1;
     struct _Array *tmp = NULL;
     struct _Array *array = NULL;
     
     if (controller.buckets == NULL) {
-        controller.buckets = malloc((INITCAPACITY)*(sizeof(void **)));
+        controller.buckets = malloc((A_INITCAPACITY)*(sizeof(void **)));
         if (controller.buckets == NULL) {
             perror(S_NOMEM);
             exit(EXIT_FAILURE);
         }
-        controller.total_buckets = INITCAPACITY;
+        controller.total_buckets = A_INITCAPACITY;
     }
-    if (controller.used_buckets > controller.total_buckets*LOADFACT) {
-        tmp = realloc(controller.buckets, sizeof(struct _Array) * controller.used_buckets*EXPRATE);
+    if (controller.used_buckets > controller.total_buckets*A_LOADFACT) {
+        tmp = realloc(controller.buckets, sizeof(struct _Array) * controller.used_buckets*A_EXPRATE);
         if (tmp == NULL) {
             perror(S_NOMEM); 
             exit(EXIT_FAILURE);
         }
         controller.buckets = tmp;
-        controller.total_buckets *= EXPRATE;
+        controller.total_buckets *= A_EXPRATE;
     }
-    handler = getfree();
+    handler = getfreearray();
     array = &controller.buckets[handler];
-    array->buckets = malloc(sizeof(void **)*INITCAPACITY);
+    array->buckets = malloc(sizeof(void **)*init_size);
     if (array->buckets == NULL) {
         perror(S_NOMEM);
         exit(EXIT_FAILURE);
     }
     controller.used_buckets++;
-    array->total_buckets = INITCAPACITY;
+    array->total_buckets = init_size;
     array->used_buckets = 0;
     return handler;
 }
 
-void Apurge(int handler) {
-    void *array = NULL;
+void ALpurge(int handler) {
     if (handler <= controller.used_buckets) {
-        array = controller.buckets[handler].buckets;
-        free(array);
-        array = malloc(sizeof(void **)*INITCAPACITY);
-        if (array == NULL) {
+        free(controller.buckets[handler].buckets);
+        controller.buckets[handler].buckets = malloc(sizeof(void **)*A_INITCAPACITY);
+        if (controller.buckets[handler].buckets == NULL) {
             perror(S_NOMEM); 
             exit(EXIT_FAILURE);
         }
-        controller.buckets[handler].total_buckets = INITCAPACITY;
+        controller.buckets[handler].total_buckets = A_INITCAPACITY;
         controller.buckets[handler].used_buckets = 0;
     } else {
         errno = EFAULT;
@@ -124,13 +133,14 @@ void Apurge(int handler) {
     }
 }
 
-void Adispose(int handler) {
-    void *array = NULL;
+void ALdispose(int handler) {
     if (handler <= controller.used_buckets) {
         controller.buckets[handler].total_buckets = 0;
         controller.buckets[handler].used_buckets = 0;
-        array = controller.buckets[handler].buckets;
-        free(array);
+        if (controller.buckets[handler].buckets != NULL) {
+            free(controller.buckets[handler].buckets);
+        }
+        controller.used_buckets--;
     } else {
         errno = EFAULT;
         perror(S_EFAULT);
@@ -138,7 +148,7 @@ void Adispose(int handler) {
     return;
 }
 
-void *Aadd(int handler, void *elem) {
+void *ALadd(int handler, void *elem) {
     struct _Array *a;
     
     if (handler <= controller.used_buckets) {
@@ -153,7 +163,7 @@ void *Aadd(int handler, void *elem) {
     return elem;
 }
 
-void *Aget(int handler, int i) {
+void *ALget(int handler, int i) {
     void *elem = NULL;
     if (handler <= controller.used_buckets) {
         if (controller.buckets[handler].total_buckets >= i)
@@ -165,11 +175,11 @@ void *Aget(int handler, int i) {
     return elem;
 }
 
-void *Aset(int handler, int i, void *elem) {
+void *ALset(int handler, int i, void *elem) {
     struct _Array *a;
     void *holder = NULL, *next = NULL;
     int j = 0;
-    if ((handler <= controller.used_buckets) && (i <= controller.buckets[handler].total_buckets)) {
+    if ((handler <= controller.used_buckets) && (i <= controller.buckets[handler].used_buckets)) {
         a = &controller.buckets[handler];
         next = a->buckets[i];
         a->buckets[i] = elem;
@@ -189,7 +199,7 @@ void *Aset(int handler, int i, void *elem) {
     return elem;
 }
 
-void *Aremove(int handler, int i) {
+void *ALremove(int handler, int i) {
     struct _Array *a;
     void *prev = NULL, *elem = NULL;
     int j = 0;
@@ -209,7 +219,7 @@ void *Aremove(int handler, int i) {
     return elem;
 }
 
-int Asize(int handler) {
+int ALsize(int handler) {
     int size = -1;
     if (handler <= controller.used_buckets) {
         size = controller.buckets[handler].used_buckets;
@@ -220,7 +230,7 @@ int Asize(int handler) {
     return size;
 }
 
-void** Atoarray(int handler) {
+void** ALtoarray(int handler) {
     void **array = NULL;
     if (handler <= controller.used_buckets) {
         array =  controller.buckets[handler].buckets;
@@ -231,15 +241,15 @@ void** Atoarray(int handler) {
     return array;
 }
 
-iterator Aiterator(int handler) {
+iterator ALiterator(int handler) {
     iterator it;
     if (handler <= controller.used_buckets) {
         it.handler = handler;
         it.carriage = 0;
-        it.next = Aitnext;
-        it.prev = Aitprev;
-        it.update = Aupdateit;
-        it.reset = Aresetit;
+        it.next = ALitnext;
+        it.prev = ALitprev;
+        it.update = ALupdateit;
+        it.reset = ALresetit;
         it.update(&it);
     } else {
         errno = EFAULT;
@@ -256,20 +266,20 @@ iterator Aiterator(int handler) {
 static void check(struct _Array *a) {
     void **tmp = NULL;
     
-    if (a->used_buckets > a->total_buckets*LOADFACT) {
-        tmp = realloc(a->buckets, sizeof(void**) * a->used_buckets*EXPRATE);
+    if (a->used_buckets > a->total_buckets*A_LOADFACT) {
+        tmp = realloc(a->buckets, sizeof(void**) * a->used_buckets*A_EXPRATE);
         if (tmp == NULL) {
             errno = ENOMEM;
             perror(S_NOMEM); 
             exit(EXIT_FAILURE);
         }
         a->buckets = tmp;
-        a->total_buckets *= EXPRATE;
+        a->total_buckets *= A_EXPRATE;
     }
     
 }
 
-static int getfree() {
+static int getfreearray() {
     int handler = 0;
     while ((handler < controller.used_buckets) 
            && (controller.buckets[handler].buckets != NULL))
@@ -278,7 +288,7 @@ static int getfree() {
     return handler;
 }
 
-static void *Aitnext(iterator *it) {
+static void *ALitnext(iterator *it) {
     void *elem = NULL;
     if (it->hasnext) {
         elem = controller.buckets[it->handler].buckets[it->carriage];
@@ -288,7 +298,7 @@ static void *Aitnext(iterator *it) {
     return elem;
 }
 
-static void *Aitprev(iterator *it) {
+static void *ALitprev(iterator *it) {
     void *elem = NULL;
     if (it->hasprev) {
         it->carriage--;
@@ -298,14 +308,14 @@ static void *Aitprev(iterator *it) {
     return elem;
 }
 
-static void Aupdateit(iterator *it) {
+static void ALupdateit(iterator *it) {
     it->total_elems = controller.buckets[it->handler].used_buckets;
     it->hasnext = (it->carriage < it->total_elems)?1:0;
     it->hasprev = (it->carriage > 0)?1:0;
     return;
 }
 
-static void Aresetit(iterator *it) {
+static void ALresetit(iterator *it) {
     it->carriage = 0;
     it->update(it);
 }
